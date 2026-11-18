@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: forcefields-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  manager:
+    build:
+      context: ./manager
+      dockerfile: Dockerfile
+    container_name: forcefields-manager
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DATABASE_URL=sqlite:////app/data/forcefields.db
+      - REDIS_URL=redis://redis:6379/0
+      - OFFLINE_TIMEOUT_SECONDS=30
+      - DEGRADED_TIMEOUT_SECONDS=15
+      - DEFAULT_ENROLLMENT_TOKEN=FORCEFIELDS-DEFAULT-ENROLL-KEY
+    volumes:
+      - manager_data:/app/data
+      - ./dashboard/dist:/app/dashboard/dist:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+
+volumes:
+  manager_data:
+  redis_data:

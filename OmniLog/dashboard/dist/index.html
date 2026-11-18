@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Force-Fields AI-SOC: Telemetry & JSON Normalization Engine</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2338bdf8' stroke-width='2'><path d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'/></svg>">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        soc: {
+                            bg: "#090d16",
+                            card: "#0f172a",
+                            border: "#1e293b",
+                            cyan: "#38bdf8",
+                            emerald: "#10b981",
+                            amber: "#f59e0b",
+                            rose: "#f43f5e"
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #090d16; color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        .pulsing-dot { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .4; } }
+    </style>
+</head>
+<body class="bg-[#090d16] text-slate-100 flex flex-col min-h-screen selection:bg-cyan-500 selection:text-white">
+
+    <!-- TOPBAR -->
+    <header class="border-b border-slate-800/80 bg-slate-950/90 backdrop-blur sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-600 to-blue-600 flex items-center justify-center font-bold text-white shadow-lg shadow-cyan-950/60 ring-1 ring-cyan-400/30">
+                    FF
+                </div>
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <span class="font-bold tracking-tight text-white text-base">FORCE-FIELDS</span>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-950 text-cyan-400 border border-cyan-800/60">
+                            AI-SOC TELEMETRY ENGINE
+                        </span>
+                    </div>
+                    <p class="text-[11px] text-slate-400 font-mono hidden sm:block">
+                        Stage 1 (Granular OS Collection) + Stage 2 (Unified JSON Normalization)
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-3">
+                <div class="hidden md:flex items-center space-x-2 text-xs font-mono px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800">
+                    <span id="manager-status-dot" class="w-2 h-2 rounded-full bg-emerald-400 pulsing-dot"></span>
+                    <span class="text-slate-400">MANAGER:</span>
+                    <span id="manager-status-text" class="text-emerald-400 font-semibold">ONLINE</span>
+                </div>
+
+                <a href="/api/v1/ai/export/jsonl" target="_blank" class="hidden sm:inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-mono bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition-colors">
+                    ⬇ Export AI JSONL
+                </a>
+
+                <button onclick="openEnrollModal()" class="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-medium px-4 py-2 rounded-lg shadow-md shadow-cyan-950/60 transition-all flex items-center font-sans">
+                    <span class="mr-1.5 font-bold">+</span> Enroll Agent
+                </button>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-6 border-t border-slate-900 text-xs font-mono">
+            <button onclick="switchTab('fleet')" id="tab-btn-fleet" class="py-3 font-semibold border-b-2 border-cyan-400 text-cyan-400 flex items-center space-x-2 transition-all">
+                <span>🖥️</span>
+                <span>FLEET OVERVIEW</span>
+                <span id="badge-total-agents" class="ml-1 px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300 text-[10px]">0</span>
+            </button>
+            <button onclick="switchTab('stream')" id="tab-btn-stream" class="py-3 font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 transition-all">
+                <span>⚡</span>
+                <span>LIVE SOC STREAM</span>
+            </button>
+            <button onclick="switchTab('ai')" id="tab-btn-ai" class="py-3 font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 transition-all">
+                <span>🤖</span>
+                <span>STAGE 3 AI BRIDGE</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN BODY -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+        <!-- TAB 1: FLEET OVERVIEW -->
+        <div id="tab-fleet" class="space-y-6">
+            <!-- OS Category Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="fleet-category-cards">
+                <!-- Injected via JS -->
+            </div>
+
+            <!-- Endpoint Device Table -->
+            <div class="bg-slate-900/70 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+                <div class="p-4 border-b border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-950/60">
+                    <div class="flex items-center space-x-3">
+                        <h2 class="text-sm font-semibold text-slate-100 flex items-center font-mono">
+                            <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 mr-2 shadow-sm shadow-cyan-400"></span>
+                            Dedicated Endpoint Fleet
+                            <span id="endpoint-count-badge" class="ml-2 px-2 py-0.5 rounded-full text-xs font-mono bg-slate-800 text-slate-300">0 endpoints</span>
+                        </h2>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <input type="text" id="fleet-search-input" oninput="renderFleetTable()" placeholder="Search hostname, IP, agent..." class="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono w-64">
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs font-mono">
+                        <thead class="bg-slate-950/80 text-slate-400 border-b border-slate-800">
+                            <tr>
+                                <th class="py-3 px-4">STATUS</th>
+                                <th class="py-3 px-4">HOST & AGENT ID</th>
+                                <th class="py-3 px-4">OS PLATFORM</th>
+                                <th class="py-3 px-4">IP / MAC</th>
+                                <th class="py-3 px-4">CPU & RAM</th>
+                                <th class="py-3 px-4">QUEUE DEPTH</th>
+                                <th class="py-3 px-4">EVENTS SENT</th>
+                                <th class="py-3 px-4">LAST SEEN</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fleet-table-body" class="divide-y divide-slate-800/60">
+                            <!-- Injected via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: LIVE SOC STREAM -->
+        <div id="tab-stream" class="hidden">
+            <div class="bg-slate-900/70 border border-slate-800 rounded-xl overflow-hidden shadow-xl flex flex-col h-[750px]">
+                <!-- Stream Toolbar -->
+                <div class="p-4 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-slate-950/60">
+                    <div class="flex items-center space-x-3 font-mono text-xs">
+                        <span id="stream-live-indicator" class="w-2.5 h-2.5 rounded-full bg-emerald-400 pulsing-dot"></span>
+                        <span class="font-bold text-slate-100">SOC INGESTION STREAM</span>
+                        <span id="stream-event-count" class="px-2 py-0.5 rounded bg-slate-800 text-slate-300">0 events</span>
+
+                        <button id="pause-stream-btn" onclick="togglePauseStream()" class="px-3 py-1 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 font-medium transition-colors">
+                            ⏸ Pause
+                        </button>
+                        <button onclick="clearStream()" class="px-2.5 py-1 rounded-lg border border-slate-800 text-slate-400 hover:text-slate-200">
+                            Clear
+                        </button>
+                    </div>
+
+                    <!-- Filters -->
+                    <div class="flex flex-wrap items-center gap-2 font-mono text-xs">
+                        <input type="text" id="stream-search" oninput="filterStream()" placeholder="Search cmd, user, IP..." class="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 w-44">
+
+                        <select id="filter-category" onchange="filterStream()" class="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-slate-300 focus:outline-none focus:border-cyan-500">
+                            <option value="all">All Categories</option>
+                            <option value="process">Process</option>
+                            <option value="network">Network</option>
+                            <option value="auth">Auth & Logon</option>
+                            <option value="file_or_registry">File / Registry</option>
+                            <option value="system">System</option>
+                        </select>
+
+                        <select id="filter-severity" onchange="filterStream()" class="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-slate-300 focus:outline-none focus:border-cyan-500">
+                            <option value="all">All Severities</option>
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high">High</option>
+                            <option value="critical">Critical</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Stream Table -->
+                <div class="overflow-y-auto flex-1">
+                    <table class="w-full text-left text-xs font-mono">
+                        <thead class="bg-slate-950/90 text-slate-400 sticky top-0 border-b border-slate-800 z-10">
+                            <tr>
+                                <th class="py-2.5 px-3">TIMESTAMP</th>
+                                <th class="py-2.5 px-3">HOST & OS</th>
+                                <th class="py-2.5 px-3">CATEGORY / ACTION</th>
+                                <th class="py-2.5 px-3">ACTOR</th>
+                                <th class="py-2.5 px-3">TELEMETRY DETAILS (CMD / IP / PATH)</th>
+                                <th class="py-2.5 px-3">SEVERITY</th>
+                                <th class="py-2.5 px-3 text-right">ACTION</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stream-table-body" class="divide-y divide-slate-800/40">
+                            <!-- Injected via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: STAGE 3 AI BRIDGE -->
+        <div id="tab-ai" class="hidden space-y-6">
+            <div class="p-6 bg-slate-900/80 border border-slate-800 rounded-2xl shadow-xl font-sans">
+                <div class="flex items-center space-x-3 mb-4">
+                    <span class="text-3xl">🤖</span>
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-100">Force-Fields Stage 3 AI Integration Bridge</h2>
+                        <p class="text-xs text-slate-400 font-mono mt-0.5">
+                            Real-time WebSocket and batched REST endpoints for downstream AI Threat Classification.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 my-6 font-mono text-xs">
+                    <div class="p-4 bg-slate-950 rounded-xl border border-slate-800">
+                        <div class="text-slate-400">UNPROCESSED AI QUEUE</div>
+                        <div class="text-xl font-bold text-cyan-400 mt-1">/api/v1/ai/unprocessed</div>
+                        <div class="text-[11px] text-slate-500 mt-1">Batch pull with ACK tracking</div>
+                    </div>
+                    <div class="p-4 bg-slate-950 rounded-xl border border-slate-800">
+                        <div class="text-slate-400">WEBSOCKET REAL-TIME STREAM</div>
+                        <div class="text-xl font-bold text-emerald-400 mt-1">/api/v1/ai/stream</div>
+                        <div class="text-[11px] text-slate-500 mt-1">Push stream to live inference models</div>
+                    </div>
+                    <div class="p-4 bg-slate-950 rounded-xl border border-slate-800">
+                        <div class="text-slate-400">OFFLINE TRAINING EXPORT</div>
+                        <div class="text-xl font-bold text-purple-400 mt-1">/api/v1/ai/export/jsonl</div>
+                        <div class="text-[11px] text-slate-500 mt-1">Streaming JSON Lines file</div>
+                    </div>
+                </div>
+
+                <div class="space-y-3 font-mono text-xs">
+                    <h3 className="font-semibold text-slate-200 uppercase tracking-wider">
+                        Python Integration Example for Downstream AI Classifier:
+                    </h3>
+                    <pre class="p-4 bg-slate-950 rounded-xl border border-slate-800 text-cyan-300 overflow-x-auto leading-relaxed">
+import asyncio
+import websockets
+import json
+
+async def stream_normalized_telemetry():
+    uri = "ws://localhost:8000/api/v1/ai/stream"
+    async with websockets.connect(uri) as ws:
+        print("[+] Connected to Force-Fields AI Stream.")
+        while True:
+            raw_event = await ws.recv()
+            event = json.loads(raw_event)
+            
+            # Feed standardized schema directly to Stage 3 AI Model:
+            actor = event["actor"]
+            proc = event["process"]
+            net = event["network"]
+            category = event["event"]["category"]
+            
+            print(f"[AI Ingest] {event['event_timestamp']} | {event['agent']['hostname']} | {category} | {proc.get('command_line')}")
+
+asyncio.run(stream_normalized_telemetry())</pre>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- LOG INSPECTOR DRAWER -->
+    <div id="inspector-drawer" class="fixed inset-y-0 right-0 w-full md:w-[750px] bg-slate-950 border-l border-slate-800 shadow-2xl z-50 flex flex-col font-mono transform translate-x-full transition-transform duration-300">
+        <div class="p-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+            <div>
+                <div class="flex items-center space-x-2">
+                    <span id="drawer-category-badge" class="text-xs px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800 uppercase font-bold">EVENT</span>
+                    <span id="drawer-event-id" class="text-xs text-slate-400">ID: -</span>
+                </div>
+                <h3 id="drawer-title" class="text-sm font-semibold text-slate-100 mt-1 font-sans">Event Details</h3>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button onclick="copyDrawerContent()" class="px-2.5 py-1 text-xs rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">📋 Copy JSON</button>
+                <button onclick="closeInspectorDrawer()" class="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200">✕</button>
+            </div>
+        </div>
+
+        <div class="flex border-b border-slate-800 bg-slate-900/50 text-xs font-sans">
+            <button onclick="switchDrawerTab('normalized')" id="dtab-normalized" class="flex-1 py-2.5 text-center font-medium border-b-2 border-cyan-400 text-cyan-400 bg-slate-900">Normalized AI JSON (Stage 2)</button>
+            <button onclick="switchDrawerTab('raw')" id="dtab-raw" class="flex-1 py-2.5 text-center font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200">100% Original Raw Log (Stage 1)</button>
+            <button onclick="switchDrawerTab('forensics')" id="dtab-forensics" class="flex-1 py-2.5 text-center font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200">Visual Forensics</button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-4 text-xs">
+            <div id="drawer-normalized-view" class="space-y-3">
+                <pre id="drawer-normalized-json" class="p-4 bg-slate-900/80 rounded-xl border border-slate-800 text-cyan-300 font-mono text-[11px] overflow-x-auto leading-relaxed"></pre>
+            </div>
+            <div id="drawer-raw-view" class="space-y-3 hidden">
+                <pre id="drawer-raw-json" class="p-4 bg-slate-900/80 rounded-xl border border-slate-800 text-emerald-300 font-mono text-[11px] overflow-x-auto leading-relaxed"></pre>
+            </div>
+            <div id="drawer-forensics-view" class="space-y-4 font-sans text-xs hidden">
+                <div id="forensics-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AGENT ENROLL MODAL -->
+    <div id="enroll-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 font-sans hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col">
+            <div class="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/70">
+                <div>
+                    <h3 class="text-base font-bold text-slate-100 flex items-center">
+                        <span class="text-cyan-400 mr-2 text-lg">⚡</span> Enroll Dedicated Endpoint Agent
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-0.5">Generate native single-binary deployment commands for Windows or Linux.</p>
+                </div>
+                <button onclick="closeEnrollModal()" class="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200">✕</button>
+            </div>
+
+            <div class="p-6 space-y-5 overflow-y-auto max-h-[80vh]">
+                <div>
+                    <label class="block text-xs font-mono text-slate-400 mb-2 uppercase">Select Target OS Platform</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button type="button" onclick="selectEnrollOS('windows')" id="enroll-os-win" class="py-3 px-4 rounded-xl border text-sm font-semibold flex items-center justify-center space-x-2 bg-cyan-950/80 border-cyan-500 text-cyan-300 shadow-md ring-1 ring-cyan-500">
+                            <span>🪟</span>
+                            <span>Windows 10/11 / Windows Server</span>
+                        </button>
+                        <button type="button" onclick="selectEnrollOS('linux')" id="enroll-os-lin" class="py-3 px-4 rounded-xl border text-sm font-semibold flex items-center justify-center space-x-2 bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-800/60">
+                            <span>🐧</span>
+                            <span>Ubuntu Server / Linux Endpoint</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 text-xs font-mono">
+                    <div>
+                        <label class="block text-slate-400 mb-1">MANAGER URL</label>
+                        <input type="text" id="modal-manager-url" value="http://localhost:8000" oninput="updateEnrollCommands()" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-slate-200 focus:outline-none focus:border-cyan-500">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">ENROLLMENT TOKEN</label>
+                        <input type="text" id="modal-enroll-token" value="FORCEFIELDS-DEFAULT-ENROLL-KEY" oninput="updateEnrollCommands()" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-slate-200 focus:outline-none focus:border-cyan-500">
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <h4 class="text-xs font-bold text-slate-300 font-mono uppercase tracking-wide">Deployment Steps:</h4>
+                    
+                    <div class="p-3.5 bg-slate-950 rounded-xl border border-slate-800 space-y-1.5">
+                        <div class="flex justify-between items-center text-xs font-mono">
+                            <span class="text-cyan-400 font-semibold">1. Configure OS Auditing & Telemetry</span>
+                            <button onclick="copySnippet('cmd-step1')" class="text-cyan-400 hover:underline">Copy</button>
+                        </div>
+                        <pre id="cmd-step1" class="p-2.5 bg-slate-900 rounded border border-slate-800 text-slate-200 text-xs font-mono overflow-x-auto"></pre>
+                    </div>
+
+                    <div class="p-3.5 bg-slate-950 rounded-xl border border-slate-800 space-y-1.5">
+                        <div class="flex justify-between items-center text-xs font-mono">
+                            <span class="text-cyan-400 font-semibold">2. Enroll Hardware Fingerprint</span>
+                            <button onclick="copySnippet('cmd-step2')" class="text-cyan-400 hover:underline">Copy</button>
+                        </div>
+                        <pre id="cmd-step2" class="p-2.5 bg-slate-900 rounded border border-slate-800 text-cyan-300 text-xs font-mono overflow-x-auto"></pre>
+                    </div>
+
+                    <div class="p-3.5 bg-slate-950 rounded-xl border border-slate-800 space-y-1.5">
+                        <div class="flex justify-between items-center text-xs font-mono">
+                            <span class="text-cyan-400 font-semibold">3. Install Native Background Service</span>
+                            <button onclick="copySnippet('cmd-step3')" class="text-cyan-400 hover:underline">Copy</button>
+                        </div>
+                        <pre id="cmd-step3" class="p-2.5 bg-slate-900 rounded border border-slate-800 text-slate-200 text-xs font-mono overflow-x-auto"></pre>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-4 bg-slate-950 border-t border-slate-800 flex justify-end">
+                <button onclick="closeEnrollModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CLIENT SCRIPT LOGIC -->
+    <script>
+        let currentFleet = null;
+        let streamEvents = [];
+        let isStreamPaused = false;
+        let selectedEventObj = null;
+        let enrollTargetOS = 'windows';
+        let wsInstance = null;
+
+        const OS_ICONS = {
+            windows_workstation: '🪟',
+            windows_server: '🏢',
+            ubuntu_server: '🐧',
+            linux_endpoint: '💻'
+        };
+
+        function switchTab(tab) {
+            document.getElementById('tab-fleet').classList.add('hidden');
+            document.getElementById('tab-stream').classList.add('hidden');
+            document.getElementById('tab-ai').classList.add('hidden');
+
+            document.getElementById('tab-btn-fleet').className = "py-3 font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 transition-all";
+            document.getElementById('tab-btn-stream').className = "py-3 font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 transition-all";
+            document.getElementById('tab-btn-ai').className = "py-3 font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 transition-all";
+
+            document.getElementById('tab-' + tab).classList.remove('hidden');
+            document.getElementById('tab-btn-' + tab).className = "py-3 font-semibold border-b-2 border-cyan-400 text-cyan-400 flex items-center space-x-2 transition-all";
+        }
+
+        async function fetchFleetData() {
+            try {
+                const res = await fetch('/api/v1/fleet');
+                if (res.ok) {
+                    currentFleet = await res.json();
+                    renderFleet();
+                    document.getElementById('manager-status-text').innerText = 'ONLINE';
+                    document.getElementById('manager-status-text').className = 'text-emerald-400 font-semibold';
+                    document.getElementById('manager-status-dot').className = 'w-2 h-2 rounded-full bg-emerald-400 pulsing-dot';
+                }
+            } catch (e) {
+                document.getElementById('manager-status-text').innerText = 'OFFLINE';
+                document.getElementById('manager-status-text').className = 'text-rose-400 font-semibold';
+                document.getElementById('manager-status-dot').className = 'w-2 h-2 rounded-full bg-rose-400';
+            }
+        }
+
+        function renderFleet() {
+            if (!currentFleet) return;
+
+            document.getElementById('badge-total-agents').innerText = currentFleet.total_agents;
+            document.getElementById('endpoint-count-badge').innerText = `${currentFleet.total_agents} endpoints`;
+
+            // Render category cards
+            const cardsContainer = document.getElementById('fleet-category-cards');
+            cardsContainer.innerHTML = '';
+
+            for (const [key, cat] of Object.entries(currentFleet.categories)) {
+                const card = document.createElement('div');
+                card.className = "p-5 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-800/50 hover:border-slate-700 transition-all";
+                card.innerHTML = `
+                    <div class="flex items-center justify-between mb-3 font-mono">
+                        <span class="text-2xl">${OS_ICONS[key] || '🖥️'}</span>
+                        <div class="flex items-center space-x-1.5 text-xs">
+                            <span class="px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/50">${cat.online_count} online</span>
+                            ${cat.offline_count > 0 ? `<span class="px-2 py-0.5 rounded bg-rose-950/80 text-rose-400 border border-rose-800/50">${cat.offline_count} off</span>` : ''}
+                        </div>
+                    </div>
+                    <h3 class="font-semibold text-slate-100 text-sm tracking-wide font-sans">${cat.display_name}</h3>
+                    <div class="mt-2 flex items-baseline justify-between font-mono">
+                        <span class="text-2xl font-bold text-cyan-400">${cat.total_devices}</span>
+                        <span class="text-xs text-slate-400">${cat.online_count}/${cat.total_devices} active</span>
+                    </div>
+                `;
+                cardsContainer.appendChild(card);
+            }
+
+            renderFleetTable();
+        }
+
+        function renderFleetTable() {
+            if (!currentFleet) return;
+            const search = (document.getElementById('fleet-search-input').value || '').toLowerCase();
+            const tbody = document.getElementById('fleet-table-body');
+            tbody.innerHTML = '';
+
+            const allDevices = Object.values(currentFleet.categories).flatMap(c => c.devices);
+            const filtered = allDevices.filter(d => 
+                d.hostname.toLowerCase().includes(search) ||
+                d.agent_id.toLowerCase().includes(search) ||
+                d.ip_address.includes(search)
+            );
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="py-12 text-center text-slate-500 font-sans">No enrolled agents found. Click "Enroll Agent" to add endpoints.</td></tr>`;
+                return;
+            }
+
+            for (const dev of filtered) {
+                const isOnline = dev.status === 'ONLINE';
+                const isDegraded = dev.status === 'DEGRADED';
+                const statusColor = isOnline ? 'text-emerald-400' : isDegraded ? 'text-amber-400' : 'text-rose-400';
+                const dotColor = isOnline ? 'bg-emerald-400' : isDegraded ? 'bg-amber-400' : 'bg-rose-500';
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-800/40 transition-colors";
+                tr.innerHTML = `
+                    <td class="py-3.5 px-4 whitespace-nowrap">
+                        <div class="flex items-center space-x-2">
+                            <span class="w-2.5 h-2.5 rounded-full ${dotColor} ${isOnline ? 'pulsing-dot' : ''}"></span>
+                            <span class="text-[11px] font-semibold ${statusColor}">${dev.status}</span>
+                        </div>
+                    </td>
+                    <td class="py-3.5 px-4 whitespace-nowrap">
+                        <div class="font-semibold text-slate-100">${dev.hostname}</div>
+                        <div class="text-[10px] text-slate-500">${dev.agent_id}</div>
+                    </td>
+                    <td class="py-3.5 px-4 whitespace-nowrap">
+                        <div class="text-slate-300 flex items-center">
+                            <span class="mr-1.5">${OS_ICONS[dev.os_category] || '🖥️'}</span>
+                            ${dev.os_version || dev.os_name}
+                        </div>
+                        <div class="text-[10px] text-cyan-400/80">${dev.os_category}</div>
+                    </td>
+                    <td class="py-3.5 px-4 whitespace-nowrap text-slate-300">
+                        <div>${dev.ip_address}</div>
+                        <div class="text-[10px] text-slate-500">${dev.mac_address}</div>
+                    </td>
+                    <td class="py-3.5 px-4 whitespace-nowrap">
+                        <div class="space-y-1 w-28">
+                            <div class="flex justify-between text-[10px] text-slate-400">
+                                <span>CPU ${dev.cpu_percent.toFixed(1)}%</span>
+                                <span>RAM ${dev.ram_percent.toFixed(0)}%</span>
+                            </div>
+                            <div class="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden flex">
+                                <div class="bg-cyan-500 h-1.5" style="width: ${Math.min(dev.cpu_percent, 100)}%"></div>
+                                <div class="bg-indigo-500 h-1.5" style="width: ${Math.min(dev.ram_percent, 100)}%"></div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="py-3.5 px-4 whitespace-nowrap text-slate-400">${dev.queue_depth} msgs</td>
+                    <td class="py-3.5 px-4 whitespace-nowrap text-slate-200 font-semibold">${dev.events_sent_total.toLocaleString()}</td>
+                    <td class="py-3.5 px-4 whitespace-nowrap text-slate-400 text-[11px]">${dev.last_seen_at ? new Date(dev.last_seen_at).toLocaleTimeString() : 'Never'}</td>
+                `;
+                tbody.appendChild(tr);
+            }
+        }
+
+        async function fetchStreamLogs() {
+            try {
+                const res = await fetch('/api/v1/logs?limit=100');
+                if (res.ok) {
+                    const data = await res.json();
+                    streamEvents = data.events || [];
+                    filterStream();
+                }
+            } catch (e) {}
+        }
+
+        function filterStream() {
+            const search = (document.getElementById('stream-search').value || '').toLowerCase();
+            const catFilter = document.getElementById('filter-category').value;
+            const sevFilter = document.getElementById('filter-severity').value;
+
+            const filtered = streamEvents.filter(ev => {
+                const matchesCat = catFilter === 'all' || ev.event?.category === catFilter;
+                const matchesSev = sevFilter === 'all' || ev.event?.severity_hint === sevFilter;
+                const cmd = ev.process?.command_line?.toLowerCase() || '';
+                const user = ev.actor?.user?.toLowerCase() || '';
+                const ip = (ev.network?.src_ip || '') + (ev.network?.dst_ip || '');
+                const host = ev.agent?.hostname?.toLowerCase() || '';
+                const matchesSearch = search === '' || cmd.includes(search) || user.includes(search) || ip.includes(search) || host.includes(search);
+                return matchesCat && matchesSev && matchesSearch;
+            });
+
+            document.getElementById('stream-event-count').innerText = `${filtered.length} events`;
+            const tbody = document.getElementById('stream-table-body');
+            tbody.innerHTML = '';
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="py-16 text-center text-slate-500 font-sans">No telemetry events match current filters.</td></tr>`;
+                return;
+            }
+
+            for (const ev of filtered) {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-800/40 cursor-pointer text-slate-300 transition-colors";
+                tr.onclick = () => openInspectorDrawer(ev);
+
+                let details = ev.process?.command_line || (ev.network?.src_ip ? `${ev.network.protocol?.toUpperCase() || 'TCP'} ${ev.network.src_ip}:${ev.network.src_port || '*'} -> ${ev.network.dst_ip}:${ev.network.dst_port || '*'}` : (ev.file_or_registry?.target_path || ev.event?.action));
+
+                const sev = (ev.event?.severity_hint || 'low').toLowerCase();
+                const sevBadge = sev === 'critical' ? 'bg-rose-950 text-rose-400 border-rose-800' : sev === 'high' ? 'bg-orange-950 text-orange-400 border-orange-800' : sev === 'medium' ? 'bg-amber-950 text-amber-400 border-amber-800' : 'bg-slate-900 text-slate-400 border-slate-800';
+
+                tr.innerHTML = `
+                    <td class="py-2.5 px-3 text-slate-400 whitespace-nowrap text-[11px]">${ev.event_timestamp ? new Date(ev.event_timestamp).toLocaleTimeString() : 'N/A'}</td>
+                    <td class="py-2.5 px-3 whitespace-nowrap font-semibold text-slate-200">${ev.agent?.hostname || 'UNKNOWN'}</td>
+                    <td class="py-2.5 px-3 whitespace-nowrap"><span class="px-2 py-0.5 rounded text-[10px] font-semibold border bg-slate-950 border-slate-800 text-cyan-400">${ev.event?.category} : ${ev.event?.action}</span></td>
+                    <td class="py-2.5 px-3 whitespace-nowrap text-slate-200">${ev.actor?.user || '-'}</td>
+                    <td class="py-2.5 px-3 max-w-md truncate text-slate-300 text-[11px]" title="${details}">${details}</td>
+                    <td class="py-2.5 px-3 whitespace-nowrap"><span class="px-2 py-0.5 rounded text-[10px] font-bold border uppercase ${sevBadge}">${sev}</span></td>
+                    <td class="py-2.5 px-3 text-right whitespace-nowrap"><button class="px-2 py-1 rounded bg-slate-800 hover:bg-cyan-900/60 text-cyan-400 text-[11px] border border-slate-700">Inspect →</button></td>
+                `;
+                tbody.appendChild(tr);
+            }
+        }
+
+        function togglePauseStream() {
+            isStreamPaused = !isStreamPaused;
+            const btn = document.getElementById('pause-stream-btn');
+            btn.innerText = isStreamPaused ? '▶ Resume' : '⏸ Pause';
+            btn.className = isStreamPaused ? 'px-3 py-1 rounded-lg border border-amber-800 bg-amber-950 text-amber-400 font-medium' : 'px-3 py-1 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 font-medium';
+        }
+
+        function clearStream() {
+            streamEvents = [];
+            filterStream();
+        }
+
+        function setupWebSocket() {
+            const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const url = `${proto}//${window.location.host}/api/v1/ai/stream`;
+            try {
+                wsInstance = new WebSocket(url);
+                wsInstance.onopen = () => {
+                    document.getElementById('stream-live-indicator').className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 pulsing-dot';
+                };
+                wsInstance.onmessage = (msg) => {
+                    if (isStreamPaused) return;
+                    try {
+                        const event = JSON.parse(msg.data);
+                        streamEvents.unshift(event);
+                        if (streamEvents.length > 200) streamEvents.pop();
+                        filterStream();
+                    } catch (e) {}
+                };
+                wsInstance.onclose = () => {
+                    document.getElementById('stream-live-indicator').className = 'w-2.5 h-2.5 rounded-full bg-amber-400';
+                    setTimeout(setupWebSocket, 3000);
+                };
+            } catch (e) {}
+        }
+
+        function openInspectorDrawer(ev) {
+            selectedEventObj = ev;
+            document.getElementById('drawer-event-id').innerText = `ID: ${ev.event_id.slice(0, 8)}...`;
+            document.getElementById('drawer-category-badge').innerText = `${ev.event?.category} : ${ev.event?.action}`;
+            document.getElementById('drawer-title').innerText = `${ev.agent?.hostname} — ${ev.event?.source_channel}`;
+
+            document.getElementById('drawer-normalized-json').innerText = JSON.stringify(ev, null, 2);
+            document.getElementById('drawer-raw-json').innerText = JSON.stringify(ev.full_raw_payload, null, 2);
+
+            // Render forensics
+            const fc = document.getElementById('forensics-content');
+            fc.innerHTML = `
+                <div class="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                    <h4 class="text-cyan-400 font-semibold mb-2">👤 Actor Identity</h4>
+                    <div class="grid grid-cols-2 gap-2 text-slate-300 font-mono">
+                        <div>User: <span class="text-white font-semibold">${ev.actor?.user || 'SYSTEM'}</span></div>
+                        <div>User SID: <span class="text-white">${ev.actor?.user_id || '-'}</span></div>
+                        <div>Elevated: <span class="${ev.actor?.elevated ? 'text-amber-400 font-bold' : 'text-slate-400'}">${ev.actor?.elevated ? 'YES' : 'NO'}</span></div>
+                        <div>Endpoint: <span class="text-white">${ev.agent?.hostname}</span></div>
+                    </div>
+                </div>
+                <div class="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                    <h4 class="text-cyan-400 font-semibold mb-2">⚙️ Process Execution Lineage</h4>
+                    <div class="space-y-1.5 text-slate-300 font-mono">
+                        <div>PID: <span class="text-white">${ev.process?.pid || '-'}</span> | PPID: <span class="text-white">${ev.process?.ppid || '-'}</span></div>
+                        <div>Image: <span class="text-white break-all">${ev.process?.executable || '-'}</span></div>
+                        <div>Command Line: <div class="p-2 mt-1 bg-slate-950 rounded border border-slate-800 text-cyan-300 break-all">${ev.process?.command_line || 'None'}</div></div>
+                        ${ev.process?.parent_name ? `<div>Parent: <span class="text-white">${ev.process.parent_name}</span></div>` : ''}
+                        ${ev.process?.hash_sha256 ? `<div>SHA256: <span class="text-amber-300 text-[10px] break-all">${ev.process.hash_sha256}</span></div>` : ''}
+                    </div>
+                </div>
+                ${ev.network?.src_ip || ev.network?.dst_ip ? `
+                <div class="p-4 bg-slate-900 rounded-xl border border-slate-800">
+                    <h4 class="text-cyan-400 font-semibold mb-2">🌐 Network 5-Tuple & DNS</h4>
+                    <div class="grid grid-cols-2 gap-2 text-slate-300 font-mono">
+                        <div>Protocol: <span class="text-white uppercase">${ev.network?.protocol || 'TCP'}</span></div>
+                        <div>DNS Query: <span class="text-cyan-300">${ev.network?.dns_query || '-'}</span></div>
+                        <div>Source: <span class="text-white">${ev.network?.src_ip || '*'}:${ev.network?.src_port || '*'}</span></div>
+                        <div>Destination: <span class="text-white">${ev.network?.dst_ip || '*'}:${ev.network?.dst_port || '*'}</span></div>
+                    </div>
+                </div>` : ''}
+            `;
+
+            switchDrawerTab('normalized');
+            document.getElementById('inspector-drawer').classList.remove('translate-x-full');
+        }
+
+        function closeInspectorDrawer() {
+            document.getElementById('inspector-drawer').classList.add('translate-x-full');
+        }
+
+        function switchDrawerTab(tab) {
+            document.getElementById('drawer-normalized-view').classList.add('hidden');
+            document.getElementById('drawer-raw-view').classList.add('hidden');
+            document.getElementById('drawer-forensics-view').classList.add('hidden');
+
+            document.getElementById('dtab-normalized').className = "flex-1 py-2.5 text-center font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200";
+            document.getElementById('dtab-raw').className = "flex-1 py-2.5 text-center font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200";
+            document.getElementById('dtab-forensics').className = "flex-1 py-2.5 text-center font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200";
+
+            document.getElementById(`drawer-${tab}-view`).classList.remove('hidden');
+            document.getElementById(`dtab-${tab}`).className = "flex-1 py-2.5 text-center font-medium border-b-2 border-cyan-400 text-cyan-400 bg-slate-900";
+        }
+
+        function copyDrawerContent() {
+            if (!selectedEventObj) return;
+            navigator.clipboard.writeText(JSON.stringify(selectedEventObj, null, 2));
+            alert('Unified JSON copied to clipboard!');
+        }
+
+        function openEnrollModal() {
+            document.getElementById('modal-manager-url').value = window.location.origin;
+            updateEnrollCommands();
+            document.getElementById('enroll-modal').classList.remove('hidden');
+        }
+
+        function closeEnrollModal() {
+            document.getElementById('enroll-modal').classList.add('hidden');
+        }
+
+        function selectEnrollOS(os) {
+            enrollTargetOS = os;
+            if (os === 'windows') {
+                document.getElementById('enroll-os-win').className = "py-3 px-4 rounded-xl border text-sm font-semibold flex items-center justify-center space-x-2 bg-cyan-950/80 border-cyan-500 text-cyan-300 shadow-md ring-1 ring-cyan-500";
+                document.getElementById('enroll-os-lin').className = "py-3 px-4 rounded-xl border text-sm font-semibold flex items-center justify-center space-x-2 bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-800/60";
+            } else {
+                document.getElementById('enroll-os-lin').className = "py-3 px-4 rounded-xl border text-sm font-semibold flex items-center justify-center space-x-2 bg-cyan-950/80 border-cyan-500 text-cyan-300 shadow-md ring-1 ring-cyan-500";
+                document.getElementById('enroll-os-win').className = "py-3 px-4 rounded-xl border text-sm font-semibold flex items-center justify-center space-x-2 bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-800/60";
+            }
+            updateEnrollCommands();
+        }
+
+        function updateEnrollCommands() {
+            const url = document.getElementById('modal-manager-url').value;
+            const tok = document.getElementById('modal-enroll-token').value;
+
+            if (enrollTargetOS === 'windows') {
+                document.getElementById('cmd-step1').innerText = `powershell -ExecutionPolicy Bypass -File .\\setup-windows-telemetry.ps1`;
+                document.getElementById('cmd-step2').innerText = `.\\forcefields-agent-windows-amd64.exe --enroll --manager ${url} --token ${tok}`;
+                document.getElementById('cmd-step3').innerText = `.\\forcefields-agent-windows-amd64.exe --install-service`;
+            } else {
+                document.getElementById('cmd-step1').innerText = `sudo bash ./setup-linux-telemetry.sh`;
+                document.getElementById('cmd-step2').innerText = `sudo ./forcefields-agent-linux-amd64 --enroll --manager ${url} --token ${tok}`;
+                document.getElementById('cmd-step3').innerText = `sudo ./forcefields-agent-linux-amd64 --install-service`;
+            }
+        }
+
+        function copySnippet(elementId) {
+            const text = document.getElementById(elementId).innerText;
+            navigator.clipboard.writeText(text);
+            alert('Command copied to clipboard!');
+        }
+
+        // Initialize polling and WebSocket
+        fetchFleetData();
+        fetchStreamLogs();
+        setupWebSocket();
+        setInterval(fetchFleetData, 5000);
+    </script>
+</body>
+</html>
